@@ -97,14 +97,14 @@ def calculate_star_type(birthday_str):
     return result, simplified, ten_count
 
 # ==========================================
-# 繪圖邏輯 (深色字體 + 亮色 3D 陰影)
+# 繪圖邏輯 (程式碼繪製 3D 星星 + 3D 深色文字)
 # ==========================================
 def draw_star_with_repeated_numbers(result, typen, digit_count, ten_count):
     # 動態寬度：根據星星數量增加畫布寬度
     width = 800 + (ten_count * 500) 
     height = 1000
     
-    # 背景色
+    # 背景色 (深藍夜空)
     bg_color = "#131424"
     img = Image.new('RGB', (width, height), bg_color)
     draw = ImageDraw.Draw(img)
@@ -120,16 +120,6 @@ def draw_star_with_repeated_numbers(result, typen, digit_count, ten_count):
         font_center = ImageFont.load_default()
         font_data = ImageFont.load_default()
 
-    # 載入外部美術星星圖檔
-    star_filename = "star.png" 
-    try:
-        custom_star = Image.open(star_filename).convert("RGBA")
-        star_size = (480, 480) 
-        custom_star = custom_star.resize(star_size, Image.Resampling.LANCZOS)
-    except Exception as e:
-        st.error(f"⚠️ 找不到美術圖檔 '{star_filename}'，請確認檔案已上傳至專案資料夾。")
-        return None
-
     # 🎨 建立 3D 文字繪製工具函數
     def draw_3d_text(x, y, text, top_color, side_color, font_obj, anchor_type="mm", depth=3):
         # 產生厚度與陰影 (使用亮色作為陰影底座)
@@ -139,117 +129,6 @@ def draw_star_with_repeated_numbers(result, typen, digit_count, ten_count):
         draw.text((x, y), text, fill=top_color, font=font_obj, anchor=anchor_type)
         
     # 繪製左上角分析資訊
-    # 頂層為深黑藍色，底層為明亮的銀灰色，確保在夜空背景下清晰可見
     zz = 0
     for k, v in result.items():
-        draw_3d_text(50, 50 + zz, f"{k}: {v}", top_color="#0A0B14", side_color="#E0E0E0", font_obj=font_data, anchor_type="lm", depth=2)
-        zz += 35
-
-    # 準備數字計數資料 (索引 0=1, 9=10)
-    numbers_with_counts = [(str(i), int(digit_count[str(i)])) for i in range(1, 11)]
-
-    current_t = typen
-
-    # 繪製星星階段
-    for trans in range(ten_count + 1):
-        if trans > 0:
-            current_t = get_next_type(current_t)
-            
-        center = (400 + (trans * 500), height // 2)
-        
-        # 貼上美術星星圖片
-        paste_x = int(center[0] - star_size[0] / 2)
-        paste_y = int(center[1] - star_size[1] / 2)
-        img.paste(custom_star, (paste_x, paste_y), mask=custom_star)
-
-        # 建立隱形鷹架用來定位數字
-        radius_outer = 200
-        radius_inner = 80
-        label_offset = 75 
-        layer_spacing = 15
-
-        points = []
-        for i in range(5):
-            outer_angle = math.radians(90 + i * 72)
-            inner_angle = math.radians(90 + i * 72 + 36)
-            points.append((center[0] + radius_outer * math.cos(outer_angle),
-                           center[1] - radius_outer * math.sin(outer_angle)))
-            points.append((center[0] + radius_inner * math.cos(inner_angle),
-                           center[1] - radius_inner * math.sin(inner_angle)))
-
-        # 標記數字 (使用 3D 繪圖工具)
-        for idx, (px, py) in enumerate(points):
-            number, count = numbers_with_counts[idx]
-            static_text = ",".join([number] * count) if count > 0 else " "
-            
-            shift_idx = (idx - 1 + current_t) % 10
-            number1, count1 = numbers_with_counts[shift_idx]
-            dy_text = f"({','.join([number1] * count1)})" if count1 > 0 else " "
-
-            angle = math.atan2(py - center[1], px - center[0])
-            base_x = px + label_offset * math.cos(angle) 
-            base_y = py + label_offset * math.sin(angle)
-            
-            # 動態數字: 頂層深酒紅，底層亮粉紅 (維持紅色系的區別，但改為深色為主)
-            if dy_text.strip():
-                draw_3d_text(base_x, base_y - layer_spacing, dy_text, top_color="#4A0000", side_color="#FF9999", font_obj=font, anchor_type="mm", depth=3)
-            
-            # 靜態數字: 頂層深黑夜色，底層亮金色 (與星星材質呼應)
-            if static_text.strip():
-                draw_3d_text(base_x, base_y + layer_spacing, static_text, top_color="#1A1C29", side_color="#F9E596", font_obj=font, anchor_type="mm", depth=3)
-
-        # 顯示中心 T 類型 (頂層深黑夜色，底層厚實亮金色，創造刻在金幣上的質感)
-        draw_3d_text(center[0], center[1], f"T {current_t}", top_color="#131424", side_color="#D4AF37", font_obj=font_center, anchor_type="mm", depth=5)
-
-    # 輸出圖檔
-    img_buffer = io.BytesIO()
-    img.save(img_buffer, format="PNG")
-    img_buffer.seek(0)
-    return img_buffer
-
-# ==========================================
-# Streamlit 網頁 UI
-# ==========================================
-st.set_page_config(page_title="身體自覺五星術分析", layout="wide")
-
-st.title("🌟 身體自覺五星術分析系統")
-
-col1, col2 = st.columns([1, 3])
-
-with col1:
-    birthday = st.text_input("輸入生日 (YYYYMMDD)", value="20250519", max_chars=8)
-    run_btn = st.button("開始分析與繪圖", type="primary", use_container_width=True)
-
-if run_btn:
-    if len(birthday) == 8 and birthday.isdigit():
-        try:
-            valid_date = datetime.strptime(birthday, "%Y%m%d")
-            
-            with st.spinner('立體渲染與分析中...'):
-                res, start_t, num_trans = calculate_star_type(birthday)
-                counts = analyze_date_code(birthday)
-                counts = modify_code(birthday, counts)
-                
-                with col1:
-                    st.subheader("📋 數據報告")
-                    for key, val in res.items():
-                        st.write(f"**{key}**: {val}")
-                
-                with col2:
-                    st.subheader("🎨 星型變化圖軌跡")
-                    final_img = draw_star_with_repeated_numbers(res, start_t, counts, num_trans)
-                    
-                    if final_img is not None:
-                        st.image(final_img, use_container_width=True)
-                        
-                        st.download_button(
-                            label="📥 下載完整分析圖",
-                            data=final_img,
-                            file_name=f"5star_{birthday}.png",
-                            mime="image/png",
-                            use_container_width=True
-                        )
-        except ValueError:
-            st.error("❌ 日期無效：請輸入真實存在的日期（例如：不能輸入 13 月或 32 日）")
-    else:
-        st.error("❌ 格式錯誤：請輸入 8 位數字的生日，例如 19851020")
+        draw_3d_text(50, 50 + zz, f"{k}: {v}", top_color="#0A0B1
